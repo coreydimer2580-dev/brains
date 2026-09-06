@@ -5,9 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [WorkoutEntity::class], version = 1, exportSchema = false)
+@Database(entities = [WorkoutEntity::class, IdeaEntity::class, CommandEntity::class, CommunityTaskEntity::class], version = 4, exportSchema = false)
 abstract class BrainDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
+    abstract fun ideaDao(): IdeaDao
+    abstract fun commandDao(): CommandDao
+    abstract fun communityTaskDao(): CommunityTaskDao
 
     companion object {
         @Volatile

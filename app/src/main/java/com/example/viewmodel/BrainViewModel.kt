@@ -22,8 +22,24 @@ enum class ActiveGame {
     MEMORY_GRID,
     STROOP_SPEED,
     SYNAPSE_MATH,
-    NEURO_QUIZ
+    NEURO_QUIZ,
+    FOCUS_TRAINER
 }
+
+enum class MemoryGameMode {
+    CARD_MATCH,       // Simple, un-confusing pair match (universally understood)
+    PATTERN_SEQUENCE  // Visual pattern recall (with step badges, replay, and 3 lives)
+}
+
+data class MemoryCardItem(
+    val id: Int,
+    val pairId: Int,
+    val title: String,
+    val symbol: String,
+    val color: Color,
+    val isFaceUp: Boolean = false,
+    val isMatched: Boolean = false
+)
 
 data class StroopChallenge(
     val wordText: String,
@@ -50,6 +66,8 @@ data class GameResult(
 class BrainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: BrainRepository
+    private val insightsRepository = com.example.data.repository.BrainInsightsRepository()
+
     init {
         val db = BrainDatabase.getInstance(application)
         repository = BrainRepository(db.workoutDao())
@@ -57,6 +75,38 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
 
     val workoutHistory: StateFlow<List<WorkoutEntity>> = repository.allWorkouts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _brainInsight = MutableStateFlow<String?>(null)
+    val brainInsight: StateFlow<String?> = _brainInsight.asStateFlow()
+
+    private val _isFetchingInsight = MutableStateFlow(false)
+    val isFetchingInsight: StateFlow<Boolean> = _isFetchingInsight.asStateFlow()
+
+    fun fetchPersonalizedInsight() {
+        if (_isFetchingInsight.value) return
+        
+        viewModelScope.launch {
+            _isFetchingInsight.value = true
+            try {
+                val workouts = workoutHistory.value
+                val bq = calculateBrainQuotient(workouts)
+                val summary = generateWorkoutSummary(workouts)
+                
+                val insight = insightsRepository.getPersonalizedInsights(summary, bq)
+                _brainInsight.value = insight
+            } finally {
+                _isFetchingInsight.value = false
+            }
+        }
+    }
+
+    private fun generateWorkoutSummary(workouts: List<WorkoutEntity>): String {
+        if (workouts.isEmpty()) return "No workouts completed yet."
+        val recent = workouts.take(5)
+        return recent.joinToString("\n") { 
+            "- ${it.gameType}: Score ${it.score}, Accuracy ${(it.accuracy * 100).toInt()}%" 
+        }
+    }
 
     // Navigation & Inspection State
     private val _selectedTab = MutableStateFlow(0)
@@ -72,13 +122,51 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
     val lastGameResult: StateFlow<GameResult?> = _lastGameResult.asStateFlow()
 
     // ----------------------------------------------------
-    // MEMORY GRID GAME STATE
+    // SIMPLE MEMORY GAME STATE (Card Pairs + Pattern Sequence)
     // ----------------------------------------------------
+    private val _memoryMode = MutableStateFlow(MemoryGameMode.CARD_MATCH)
+    val memoryMode: StateFlow<MemoryGameMode> = _memoryMode.asStateFlow()
+
+    // Card Match State (Zero confusion, classic pairs)
+    private val _cardList = MutableStateFlow<List<MemoryCardItem>>(emptyList())
+    val cardList: StateFlow<List<MemoryCardItem>> = _cardList.asStateFlow()
+
+    private val _cardMoves = MutableStateFlow(0)
+    val cardMoves: StateFlow<Int> = _cardMoves.asStateFlow()
+
+    private val _cardMatchedPairs = MutableStateFlow(0)
+    val cardMatchedPairs: StateFlow<Int> = _cardMatchedPairs.asStateFlow()
+
+    private val _isCardMatchWon = MutableStateFlow(false)
+    val isCardMatchWon: StateFlow<Boolean> = _isCardMatchWon.asStateFlow()
+
+    private val _isCheckingCards = MutableStateFlow(false)
+    val isCheckingCards: StateFlow<Boolean> = _isCheckingCards.asStateFlow()
+
+    private val _cardElapsedTimeSec = MutableStateFlow(0)
+    val cardElapsedTimeSec: StateFlow<Int> = _cardElapsedTimeSec.asStateFlow()
+
+    private var cardTimerJob: Job? = null
+    private val flippedCardIndices = mutableListOf<Int>()
+
+    // Pattern Sequence State (Un-confusing: step badges, replay, 3 lives)
     private val _gridSequence = MutableStateFlow<List<Int>>(emptyList())
     val gridSequence: StateFlow<List<Int>> = _gridSequence.asStateFlow()
 
     private val _activeHighlightedTile = MutableStateFlow<Int?>(null)
     val activeHighlightedTile: StateFlow<Int?> = _activeHighlightedTile.asStateFlow()
+
+    private val _patternStepNumber = MutableStateFlow<Int?>(null)
+    val patternStepNumber: StateFlow<Int?> = _patternStepNumber.asStateFlow()
+
+    private val _patternFeedback = MutableStateFlow("Tap any card to begin")
+    val patternFeedback: StateFlow<String> = _patternFeedback.asStateFlow()
+
+    private val _lastTappedMistakeTile = MutableStateFlow<Int?>(null)
+    val lastTappedMistakeTile: StateFlow<Int?> = _lastTappedMistakeTile.asStateFlow()
+
+    private val _memoryLives = MutableStateFlow(3)
+    val memoryLives: StateFlow<Int> = _memoryLives.asStateFlow()
 
     private val _userMemoryInput = MutableStateFlow<List<Int>>(emptyList())
     val userMemoryInput: StateFlow<List<Int>> = _userMemoryInput.asStateFlow()
@@ -186,6 +274,7 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
             ActiveGame.STROOP_SPEED -> startStroopGame()
             ActiveGame.SYNAPSE_MATH -> startMathGame()
             ActiveGame.NEURO_QUIZ -> startQuizGame()
+            ActiveGame.FOCUS_TRAINER -> cancelAllGameJobs()
             ActiveGame.NONE -> {}
         }
     }
@@ -197,25 +286,175 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun cancelAllGameJobs() {
         memoryPlaybackJob?.cancel()
+        cardTimerJob?.cancel()
         stroopTimerJob?.cancel()
         mathTimerJob?.cancel()
     }
 
     // ====================================================
-    // MEMORY GRID LOGIC
+    // SIMPLE MEMORY LOGIC (Card Match & Pattern Sequence)
     // ====================================================
+
+    fun setMemoryMode(mode: MemoryGameMode) {
+        _memoryMode.value = mode
+        if (mode == MemoryGameMode.CARD_MATCH) {
+            if (_cardList.value.isEmpty() || _isCardMatchWon.value) {
+                startCardMatchGame()
+            }
+        } else {
+            if (_gridSequence.value.isEmpty() || _isMemoryGameOver.value) {
+                startPatternSequenceGame()
+            }
+        }
+    }
+
+    /**
+     * Card Match (Pair Matching):
+     * The classic, universally understood memory game.
+     * Flip 2 cards to find matching neuroscience icons.
+     * Zero confusion, pure spatial working memory.
+     */
+    fun startCardMatchGame() {
+        cancelAllGameJobs()
+        _isCardMatchWon.value = false
+        _cardMoves.value = 0
+        _cardMatchedPairs.value = 0
+        _cardElapsedTimeSec.value = 0
+        _isCheckingCards.value = false
+        flippedCardIndices.clear()
+
+        val templates = listOf(
+            Triple("Neuron", "⚡", Color(0xFF38BDF8)),
+            Triple("Cortex", "🧠", Color(0xFFA855F7)),
+            Triple("Synapse", "💡", Color(0xFFF59E0B)),
+            Triple("Vision", "👁️", Color(0xFF10B981)),
+            Triple("Helix", "🧬", Color(0xFFEC4899)),
+            Triple("Emotion", "❤️", Color(0xFFEF4444))
+        )
+
+        val cards = mutableListOf<MemoryCardItem>()
+        var idCounter = 0
+        templates.forEachIndexed { pairId, (title, symbol, color) ->
+            cards.add(MemoryCardItem(id = idCounter++, pairId = pairId, title = title, symbol = symbol, color = color))
+            cards.add(MemoryCardItem(id = idCounter++, pairId = pairId, title = title, symbol = symbol, color = color))
+        }
+        _cardList.value = cards.shuffled()
+
+        // Elapsed time counter
+        cardTimerJob = viewModelScope.launch {
+            while (!_isCardMatchWon.value) {
+                delay(1000)
+                _cardElapsedTimeSec.value += 1
+            }
+        }
+    }
+
+    fun onCardTapped(cardId: Int) {
+        if (_isCheckingCards.value || _isCardMatchWon.value) return
+        val currentCards = _cardList.value
+        val clickedIndex = currentCards.indexOfFirst { it.id == cardId }
+        if (clickedIndex == -1) return
+
+        val card = currentCards[clickedIndex]
+        if (card.isFaceUp || card.isMatched) return
+
+        // Flip card face up
+        val updated = currentCards.toMutableList()
+        updated[clickedIndex] = card.copy(isFaceUp = true)
+        _cardList.value = updated
+        flippedCardIndices.add(clickedIndex)
+
+        if (flippedCardIndices.size == 2) {
+            _cardMoves.value += 1
+            val idx1 = flippedCardIndices[0]
+            val idx2 = flippedCardIndices[1]
+            val c1 = updated[idx1]
+            val c2 = updated[idx2]
+
+            if (c1.pairId == c2.pairId) {
+                // Match found!
+                val matchedList = updated.toMutableList()
+                matchedList[idx1] = c1.copy(isMatched = true)
+                matchedList[idx2] = c2.copy(isMatched = true)
+                _cardList.value = matchedList
+                _cardMatchedPairs.value += 1
+                flippedCardIndices.clear()
+
+                if (_cardMatchedPairs.value >= 6) {
+                    _isCardMatchWon.value = true
+                    cardTimerJob?.cancel()
+                    val moves = _cardMoves.value
+                    val timeSec = _cardElapsedTimeSec.value
+                    val score = max(100, 1200 - (moves * 30) - (timeSec * 4))
+                    val accuracy = (6f / moves.coerceAtLeast(6)).coerceIn(0.5f, 1.0f)
+
+                    saveWorkoutResult(
+                        gameType = "MEMORY_GRID",
+                        score = score,
+                        accuracy = accuracy,
+                        avgReactionTime = (timeSec * 1000L / moves.coerceAtLeast(1)),
+                        level = 1
+                    )
+                }
+            } else {
+                // Mismatch: show for 850ms then flip back
+                _isCheckingCards.value = true
+                viewModelScope.launch {
+                    delay(850)
+                    val resetList = _cardList.value.toMutableList()
+                    resetList[idx1] = resetList[idx1].copy(isFaceUp = false)
+                    resetList[idx2] = resetList[idx2].copy(isFaceUp = false)
+                    _cardList.value = resetList
+                    flippedCardIndices.clear()
+                    _isCheckingCards.value = false
+                }
+            }
+        }
+    }
+
+    /**
+     * Peeks at cards for 1.2 seconds so users never feel stuck or confused.
+     */
+    fun peekCards() {
+        if (_isCheckingCards.value || _isCardMatchWon.value) return
+        viewModelScope.launch {
+            _isCheckingCards.value = true
+            val prev = _cardList.value
+            _cardList.value = prev.map { it.copy(isFaceUp = true) }
+            delay(1200)
+            _cardList.value = prev.map { if (it.isMatched) it else it.copy(isFaceUp = false) }
+            _isCheckingCards.value = false
+        }
+    }
+
+    /**
+     * Pattern Sequence Recall:
+     * Overhauled to prevent confusion:
+     * - Numbered step badges on each flashing tile (Step #1, #2...)
+     * - "Replay Pattern" button so user can re-watch without penalty
+     * - 3 Lives instead of abrupt game over on a single misclick
+     * - Friendly real-time instructions
+     */
     fun startMemoryGridGame() {
+        cancelAllGameJobs()
+        startCardMatchGame()
+        startPatternSequenceGame()
+    }
+
+    fun startPatternSequenceGame() {
         cancelAllGameJobs()
         _memoryLevel.value = 1
         _memoryScore.value = 0
+        _memoryLives.value = 3
         _isMemoryGameOver.value = false
         _userMemoryInput.value = emptyList()
+        _lastTappedMistakeTile.value = null
         generateNewMemorySequence(1)
     }
 
     private fun generateNewMemorySequence(level: Int) {
-        val length = 2 + level
-        val sequence = List(length) { Random.nextInt(0, 9) } // 3x3 grid (indices 0..8)
+        val length = (1 + level).coerceAtMost(7)
+        val sequence = List(length) { Random.nextInt(0, 9) }
         _gridSequence.value = sequence
         _userMemoryInput.value = emptyList()
         playSequencePreview(sequence)
@@ -225,51 +464,78 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
         memoryPlaybackJob?.cancel()
         memoryPlaybackJob = viewModelScope.launch {
             _isShowingSequence.value = true
+            _patternFeedback.value = "👀 Watch carefully! (${sequence.size} steps)"
+            _lastTappedMistakeTile.value = null
             delay(500)
-            for (tile in sequence) {
+            for ((stepIdx, tile) in sequence.withIndex()) {
                 _activeHighlightedTile.value = tile
-                delay(480)
+                _patternStepNumber.value = stepIdx + 1
+                _patternFeedback.value = "Step ${stepIdx + 1} of ${sequence.size}"
+                delay(650)
                 _activeHighlightedTile.value = null
-                delay(220)
+                _patternStepNumber.value = null
+                delay(260)
             }
             _isShowingSequence.value = false
+            _patternFeedback.value = "👉 Your turn! Tap step 1 of ${sequence.size}"
         }
+    }
+
+    fun replayPattern() {
+        if (_isShowingSequence.value || _isMemoryGameOver.value) return
+        _userMemoryInput.value = emptyList()
+        _lastTappedMistakeTile.value = null
+        playSequencePreview(_gridSequence.value)
     }
 
     fun onMemoryTileTapped(index: Int) {
         if (_isShowingSequence.value || _isMemoryGameOver.value) return
 
         val currentInput = _userMemoryInput.value + index
-        _userMemoryInput.value = currentInput
-
         val currentIndex = currentInput.size - 1
         val expected = _gridSequence.value.getOrNull(currentIndex)
 
         if (expected != null && expected == index) {
-            // Correct tile
+            _userMemoryInput.value = currentInput
+            _lastTappedMistakeTile.value = null
+
             if (currentInput.size == _gridSequence.value.size) {
                 // Completed the round!
-                _memoryScore.value += 100 * _memoryLevel.value
+                _patternFeedback.value = "🎉 Great job! Level ${_memoryLevel.value} cleared."
+                _memoryScore.value += 120 * _memoryLevel.value
                 val nextLevel = _memoryLevel.value + 1
                 _memoryLevel.value = nextLevel
                 viewModelScope.launch {
-                    delay(400)
+                    delay(700)
                     generateNewMemorySequence(nextLevel)
                 }
+            } else {
+                val nextStep = currentInput.size + 1
+                _patternFeedback.value = "✓ Step ${currentInput.size} matched! Tap step $nextStep of ${_gridSequence.value.size}"
             }
         } else {
-            // Mistake - Game Over
-            _isMemoryGameOver.value = true
-            val finalScore = _memoryScore.value
-            val level = _memoryLevel.value
-            val accuracy = if (level > 1) 0.85f else 0.5f
-            saveWorkoutResult(
-                gameType = "MEMORY_GRID",
-                score = finalScore,
-                accuracy = accuracy,
-                avgReactionTime = 520L,
-                level = level
-            )
+            // Mistake made
+            _lastTappedMistakeTile.value = index
+            val newLives = _memoryLives.value - 1
+            _memoryLives.value = newLives
+
+            if (newLives > 0) {
+                _patternFeedback.value = "Oops! You have $newLives ${if (newLives == 1) "life" else "lives"} left. Tap 'Replay Pattern' to watch again!"
+                _userMemoryInput.value = emptyList()
+            } else {
+                _patternFeedback.value = "Pattern finished! Great cognitive exercise."
+                _isMemoryGameOver.value = true
+                val finalScore = _memoryScore.value
+                val level = _memoryLevel.value
+                val accuracy = (level.toFloat() / (level + 2)).coerceIn(0.5f, 0.95f)
+                saveWorkoutResult(
+                    gameType = "MEMORY_GRID",
+                    score = finalScore,
+                    accuracy = accuracy,
+                    avgReactionTime = 520L,
+                    level = level
+                )
+            }
         }
     }
 
@@ -620,6 +886,16 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         return max(streak, 1)
+    }
+
+    fun recordFocusSession(durationSec: Int = 30) {
+        saveWorkoutResult(
+            gameType = "FOCUS_TRAINING",
+            score = durationSec * 10,
+            accuracy = 1.0f,
+            avgReactionTime = durationSec * 1000L,
+            level = 1
+        )
     }
 
     fun clearStatsHistory() {

@@ -327,6 +327,26 @@ private fun LobeDetailCard(
                 )
             }
 
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Revealed Educational Description
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = lobe.accentColor.copy(alpha = 0.10f),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = lobe.accentColor.copy(alpha = 0.25f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = lobe.description,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Functions Section

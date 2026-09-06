@@ -8,6 +8,7 @@ data class BrainLobe(
     val name: String,
     val latinName: String,
     val subtitle: String,
+    val description: String,
     val accentColor: Color,
     val functions: List<String>,
     val keyNeurotransmitters: List<String>,
@@ -57,6 +58,7 @@ object BrainDataRepository {
             name = "Frontal Lobe",
             latinName = "Lobus frontalis",
             subtitle = "Executive Function & Decision Making",
+            description = "Occupying the front of the brain, the frontal lobe is your cognitive command center. It orchestrates conscious decision-making, working memory, impulse inhibition, goal-directed planning, voluntary movement, and expressive language.",
             accentColor = AccentFrontal,
             functions = listOf(
                 "Executive cognitive control & planning",
@@ -76,6 +78,7 @@ object BrainDataRepository {
             name = "Parietal Lobe",
             latinName = "Lobus parietalis",
             subtitle = "Sensory Integration & Spatial Logic",
+            description = "Situated at the upper posterior cortex, the parietal lobe merges sensory feedback into a unified internal map. It handles touch and spatial awareness, manipulates 3D mental geometry, and calculates numerical relationships.",
             accentColor = AccentParietal,
             functions = listOf(
                 "Somatosensory processing (touch, temperature, pain)",
@@ -94,6 +97,7 @@ object BrainDataRepository {
             name = "Occipital Lobe",
             latinName = "Lobus occipitalis",
             subtitle = "Visual Cortex & Pattern Processing",
+            description = "Nestled at the back of the skull, the occipital lobe houses the primary visual cortex (V1). It decodes optical signals from the retina into perceived shapes, depth, high-speed motion, color frequencies, and object recognition.",
             accentColor = AccentOccipital,
             functions = listOf(
                 "Primary visual processing (Area V1)",
@@ -112,6 +116,7 @@ object BrainDataRepository {
             name = "Temporal Lobe",
             latinName = "Lobus temporalis",
             subtitle = "Memory Encoding & Language Audio",
+            description = "Resting along the sides of the cerebrum near your ears, the temporal lobe is the core hub for auditory processing, speech comprehension (Wernicke's area), and converting short-term experiences into long-term memories via the hippocampus.",
             accentColor = AccentTemporal,
             functions = listOf(
                 "Hippocampal memory consolidation",
@@ -130,6 +135,7 @@ object BrainDataRepository {
             name = "Cerebellum",
             latinName = "Cerebellum (Little Brain)",
             subtitle = "Motor Precision, Balance & Timing",
+            description = "Located beneath the occipital and temporal lobes, the cerebellum packs over 50 billion densely organized neurons. It fine-tunes motor coordination, maintains equilibrium, and synchronizes milliseconds-accurate timing for learned movements.",
             accentColor = AccentCerebellum,
             functions = listOf(
                 "Precision muscle coordination and balance",
@@ -148,6 +154,7 @@ object BrainDataRepository {
             name = "Limbic & Hippocampus",
             latinName = "Systema limbicum",
             subtitle = "Emotion, Salience & Neurogenesis",
+            description = "Deep within the brain's core sits the limbic system, enclosing the amygdala and hippocampus. It regulates primal emotional responses, stress survival hormones, memory indexing, and is one of the few sites where adult neurogenesis continuously occurs.",
             accentColor = AccentLimbic,
             functions = listOf(
                 "Emotional salience & fear conditioning (Amygdala)",

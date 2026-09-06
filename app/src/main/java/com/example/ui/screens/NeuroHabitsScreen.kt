@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.BrainDataRepository
 import com.example.model.NeuroMyth
+import com.example.ui.components.FocusTrainingTimer
 import com.example.ui.components.SectionHeader
 import com.example.viewmodel.BrainViewModel
 
@@ -67,7 +68,24 @@ fun NeuroHabitsScreen(
             }
         }
 
-        // 1. Flashcard Section
+        // 1. Visual Focus Training Timer (30-second fixation anchor)
+        item {
+            SectionHeader(
+                title = "Focus Training Anchor",
+                subtitle = "30-second visual fixation exercise to boost concentration"
+            )
+        }
+
+        item {
+            FocusTrainingTimer(
+                totalSeconds = 30,
+                onSessionComplete = {
+                    viewModel.recordFocusSession(30)
+                }
+            )
+        }
+
+        // 2. Flashcard Section
         item {
             SectionHeader(
                 title = "Neuro Flashcards",

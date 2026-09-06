@@ -21,7 +21,9 @@ import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -30,12 +32,64 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.AnatomyExploreScreen
+import com.example.ui.screens.BrainExplorerScreen
 import com.example.ui.screens.BrainGymScreen
 import com.example.ui.screens.NeuroHabitsScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.ActiveGame
 import com.example.viewmodel.BrainViewModel
+import com.example.viewmodel.ChatbotViewModel
+import com.example.ui.screens.ChatbotScreen
+import com.example.ui.screens.VoiceSessionScreen
+import com.example.ui.screens.ProfileAuthScreen
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Close
+import com.example.viewmodel.WellnessViewModel
+import com.example.ui.screens.WellnessSurveyScreen
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Favorite
+import com.example.viewmodel.IdeaViewModel
+import com.example.ui.screens.IdeaVaultScreen
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.outlined.Lightbulb
+
+import com.example.ui.screens.MindsetStarterScreen
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.AutoAwesome
+
+import com.example.viewmodel.TruthAnalysisViewModel
+import com.example.ui.screens.TruthAnalysisScreen
+import androidx.compose.material.icons.filled.Policy
+import androidx.compose.material.icons.outlined.Policy
+
+import com.example.viewmodel.LiveBookViewModel
+import com.example.ui.screens.LiveBookScreen
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.outlined.MenuBook
+
+import com.example.viewmodel.CommandViewModel
+import com.example.ui.screens.CommandCenterScreen
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.outlined.Terminal
+
+import com.example.viewmodel.CommunityViewModel
+import com.example.ui.screens.CommunityTasksScreen
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.outlined.Group
+
+import com.example.viewmodel.UserProgressViewModel
+import com.example.ui.screens.UserProgressScreen
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.outlined.TrendingUp
+
+import com.example.ui.screens.EvolutionBuilderScreen
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.outlined.Build
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,23 +111,41 @@ data class NavItem(
 )
 
 @Composable
-fun BrainApp(viewModel: BrainViewModel = viewModel()) {
+fun BrainApp(
+    viewModel: BrainViewModel = viewModel(), 
+    chatbotViewModel: ChatbotViewModel = viewModel(),
+    wellnessViewModel: WellnessViewModel = viewModel(),
+    ideaViewModel: IdeaViewModel = viewModel(),
+    truthAnalysisViewModel: TruthAnalysisViewModel = viewModel(),
+    liveBookViewModel: LiveBookViewModel = viewModel(),
+    commandViewModel: CommandViewModel = viewModel(),
+    communityViewModel: CommunityViewModel = viewModel(),
+    userProgressViewModel: UserProgressViewModel = viewModel()
+) {
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val activeGame by viewModel.activeGame.collectAsStateWithLifecycle()
 
     val navItems = listOf(
-        NavItem("Explore", Icons.Filled.Explore, Icons.Outlined.Explore, "nav_item_explore"),
-        NavItem("Brain Gym", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter, "nav_item_gym"),
-        NavItem("Habits", Icons.Filled.Psychology, Icons.Outlined.Psychology, "nav_item_habits"),
-        NavItem("Analytics", Icons.Filled.Insights, Icons.Outlined.Insights, "nav_item_stats")
+        NavItem("Starter", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome, "nav_item_starter"),
+        NavItem("Terminal", Icons.Filled.Terminal, Icons.Outlined.Terminal, "nav_item_terminal"),
+        NavItem("Vault", Icons.Filled.Lightbulb, Icons.Outlined.Lightbulb, "nav_item_vault"),
+        NavItem("Book", Icons.Filled.MenuBook, Icons.Outlined.MenuBook, "nav_item_book"),
+        NavItem("Progress", Icons.Filled.TrendingUp, Icons.Outlined.TrendingUp, "nav_item_progress"),
+        NavItem("Map", Icons.Filled.Psychology, Icons.Outlined.Psychology, "nav_item_map"),
+        NavItem("Evolve", Icons.Filled.Group, Icons.Outlined.Group, "nav_item_evolve"),
+        NavItem("Builder", Icons.Filled.Build, Icons.Outlined.Build, "nav_item_builder"),
+        NavItem("Coach", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubble, "nav_item_coach"),
+        NavItem("Analyzer", Icons.Filled.Policy, Icons.Outlined.Policy, "nav_item_analyzer"),
+        NavItem("Wellness", Icons.Filled.Favorite, Icons.Outlined.Favorite, "nav_item_wellness")
     )
+
+    var showVoiceSession by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            // Only display bottom navigation bar when not playing a workout mini-game
-            if (activeGame == ActiveGame.NONE) {
+            if (activeGame == ActiveGame.NONE && !showVoiceSession) {
                 NavigationBar(
                     windowInsets = WindowInsets.navigationBars,
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -93,7 +165,9 @@ fun BrainApp(viewModel: BrainViewModel = viewModel()) {
                             label = {
                                 Text(
                                     text = item.title,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -103,9 +177,16 @@ fun BrainApp(viewModel: BrainViewModel = viewModel()) {
                             ),
                             modifier = Modifier
                                 .testTag(item.testTag)
-                                .height(56.dp)
+                                .height(64.dp)
                         )
                     }
+                }
+            }
+        },
+        floatingActionButton = {
+            if (selectedTab == 8 && activeGame == ActiveGame.NONE && !showVoiceSession) {
+                FloatingActionButton(onClick = { showVoiceSession = true }) {
+                    Icon(androidx.compose.material.icons.Icons.Default.Mic, contentDescription = "Voice Session")
                 }
             }
         }
@@ -115,21 +196,37 @@ fun BrainApp(viewModel: BrainViewModel = viewModel()) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            AnimatedContent(
-                targetState = if (activeGame != ActiveGame.NONE) -1 else selectedTab,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "tab_transition"
-            ) { targetTab ->
-                when (targetTab) {
-                    -1 -> {
-                        // Game in progress
-                        BrainGymScreen(viewModel = viewModel)
+            if (showVoiceSession) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    VoiceSessionScreen()
+                    IconButton(
+                        onClick = { showVoiceSession = false },
+                        modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 16.dp)
+                    ) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Close")
                     }
-                    0 -> AnatomyExploreScreen(viewModel = viewModel)
-                    1 -> BrainGymScreen(viewModel = viewModel)
-                    2 -> NeuroHabitsScreen(viewModel = viewModel)
-                    3 -> StatsScreen(viewModel = viewModel)
-                    else -> AnatomyExploreScreen(viewModel = viewModel)
+                }
+            } else {
+                AnimatedContent(
+                    targetState = if (activeGame != ActiveGame.NONE) -1 else selectedTab,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "tab_transition"
+                ) { targetTab ->
+                    when (targetTab) {
+                        -1 -> BrainGymScreen(viewModel = viewModel)
+                        0 -> MindsetStarterScreen()
+                        1 -> CommandCenterScreen(viewModel = commandViewModel)
+                        2 -> IdeaVaultScreen(viewModel = ideaViewModel)
+                        3 -> LiveBookScreen(viewModel = liveBookViewModel)
+                        4 -> UserProgressScreen(viewModel = userProgressViewModel)
+                        5 -> com.example.ui.screens.BrainMapScreen()
+                        6 -> CommunityTasksScreen(viewModel = communityViewModel)
+                        7 -> EvolutionBuilderScreen()
+                        8 -> ChatbotScreen(viewModel = chatbotViewModel)
+                        9 -> TruthAnalysisScreen(viewModel = truthAnalysisViewModel)
+                        10 -> WellnessSurveyScreen(viewModel = wellnessViewModel)
+                        else -> MindsetStarterScreen()
+                    }
                 }
             }
         }

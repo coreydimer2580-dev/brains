@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.FocusTrainingTimer
+import com.example.ui.components.GameHeader
 import com.example.ui.components.SectionHeader
 import com.example.viewmodel.ActiveGame
 import com.example.viewmodel.BrainViewModel
@@ -50,6 +52,41 @@ fun BrainGymScreen(
         }
         ActiveGame.NEURO_QUIZ -> {
             NeuroQuizGame(viewModel = viewModel, modifier = modifier)
+            return
+        }
+        ActiveGame.FOCUS_TRAINER -> {
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    GameHeader(
+                        title = "Focus Training",
+                        score = 300,
+                        subtitle = "Prefrontal Cortex & Visual Fixation",
+                        onExit = { viewModel.exitCurrentGame() }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        FocusTrainingTimer(
+                            totalSeconds = 30,
+                            onSessionComplete = {
+                                viewModel.recordFocusSession(30)
+                            },
+                            onClose = { viewModel.exitCurrentGame() }
+                        )
+                    }
+                }
+            }
             return
         }
         ActiveGame.NONE -> {
@@ -130,16 +167,16 @@ fun BrainGymScreen(
             )
         }
 
-        // 1. Memory Grid
+        // 1. Simple Memory
         item {
             val memoryWorkouts = workouts.filter { it.gameType == "MEMORY_GRID" }
             val topScore = memoryWorkouts.maxOfOrNull { it.score } ?: 0
             GymExerciseCard(
-                title = "Memory Grid",
-                subtitle = "Temporal & Frontal Lobe",
-                description = "Memorize and reproduce spatial tile sequences with progressive length.",
+                title = "Simple Memory",
+                subtitle = "Temporal Lobe & Hippocampus",
+                description = "Pair matching cards or calm step-by-step pattern recall designed for pure working memory.",
                 targetAttribute = "Working Memory",
-                icon = Icons.Default.GridOn,
+                icon = Icons.Default.Style,
                 accentColor = Color(0xFF38BDF8),
                 topScore = topScore,
                 onClick = { viewModel.openGame(ActiveGame.MEMORY_GRID) },
@@ -195,6 +232,23 @@ fun BrainGymScreen(
                 topScore = topScore,
                 onClick = { viewModel.openGame(ActiveGame.NEURO_QUIZ) },
                 testTag = "gym_card_neuro_quiz"
+            )
+        }
+
+        // 5. Focus Anchor
+        item {
+            val focusWorkouts = workouts.filter { it.gameType == "FOCUS_TRAINING" }
+            val completedCount = focusWorkouts.size
+            GymExerciseCard(
+                title = "Focus Anchor",
+                subtitle = "Prefrontal Cortex & Visual Fixation",
+                description = "Stare at the central focal point for 30 seconds to suppress mind-wandering and expand concentration.",
+                targetAttribute = "Attentional Focus",
+                icon = Icons.Default.Visibility,
+                accentColor = Color(0xFF0EA5E9),
+                topScore = completedCount * 300,
+                onClick = { viewModel.openGame(ActiveGame.FOCUS_TRAINER) },
+                testTag = "gym_card_focus_training"
             )
         }
     }
