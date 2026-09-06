@@ -1,0 +1,6 @@
+{
+  "name": "Brain Learning",
+  "description": "Interactive neuroscience and cognitive brain training app featuring an interactive brain explorer, cognitive memory & focus workouts, and daily brain insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
