@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
@@ -90,6 +91,17 @@ import androidx.compose.material.icons.outlined.TrendingUp
 import com.example.ui.screens.EvolutionBuilderScreen
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import com.example.viewmodel.AdminAuthViewModel
+import com.example.viewmodel.PayoutTreasuryViewModel
+import com.example.ui.screens.AdminPayoutScreen
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.unit.sp
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,6 +122,7 @@ data class NavItem(
     val testTag: String
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrainApp(
     viewModel: BrainViewModel = viewModel(), 
@@ -120,10 +133,15 @@ fun BrainApp(
     liveBookViewModel: LiveBookViewModel = viewModel(),
     commandViewModel: CommandViewModel = viewModel(),
     communityViewModel: CommunityViewModel = viewModel(),
-    userProgressViewModel: UserProgressViewModel = viewModel()
+    userProgressViewModel: UserProgressViewModel = viewModel(),
+    adminAuthViewModel: AdminAuthViewModel = viewModel(),
+    treasuryViewModel: PayoutTreasuryViewModel = viewModel()
 ) {
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val activeGame by viewModel.activeGame.collectAsStateWithLifecycle()
+    val currentUser by adminAuthViewModel.currentUser.collectAsStateWithLifecycle()
+    val isAuthedAdmin by adminAuthViewModel.isAdminAuthenticated.collectAsStateWithLifecycle()
+    val heldFundCents by treasuryViewModel.availableFundCents.collectAsStateWithLifecycle()
 
     val navItems = listOf(
         NavItem("Starter", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome, "nav_item_starter"),
@@ -131,21 +149,99 @@ fun BrainApp(
         NavItem("Vault", Icons.Filled.Lightbulb, Icons.Outlined.Lightbulb, "nav_item_vault"),
         NavItem("Book", Icons.Filled.MenuBook, Icons.Outlined.MenuBook, "nav_item_book"),
         NavItem("Progress", Icons.Filled.TrendingUp, Icons.Outlined.TrendingUp, "nav_item_progress"),
+        NavItem("Payouts", Icons.Filled.Savings, Icons.Outlined.Savings, "nav_item_payouts"),
         NavItem("Map", Icons.Filled.Psychology, Icons.Outlined.Psychology, "nav_item_map"),
         NavItem("Evolve", Icons.Filled.Group, Icons.Outlined.Group, "nav_item_evolve"),
         NavItem("Builder", Icons.Filled.Build, Icons.Outlined.Build, "nav_item_builder"),
         NavItem("Coach", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubble, "nav_item_coach"),
         NavItem("Analyzer", Icons.Filled.Policy, Icons.Outlined.Policy, "nav_item_analyzer"),
-        NavItem("Wellness", Icons.Filled.Favorite, Icons.Outlined.Favorite, "nav_item_wellness")
+        NavItem("Wellness", Icons.Filled.Favorite, Icons.Outlined.Favorite, "nav_item_wellness"),
+        NavItem("Account", Icons.Filled.Person, Icons.Outlined.Person, "nav_item_account")
     )
 
     var showVoiceSession by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showTreasuryScreen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showProfileScreen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            if (activeGame == ActiveGame.NONE && !showVoiceSession && !showTreasuryScreen && !showProfileScreen) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = "corey++sarah++",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = if (isAuthedAdmin) "Admin: ${currentUser.displayName}" else "Learner Mode",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    actions = {
+                        // Quick-access Payout Treasury button
+                        FilledTonalButton(
+                            onClick = { showTreasuryScreen = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .padding(end = 6.dp)
+                                .testTag("topbar_payout_treasury_btn")
+                        ) {
+                            Icon(
+                                Icons.Default.Savings,
+                                contentDescription = "Payout Treasury",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            val heldFormatted = String.format(Locale.US, "$%,.2f", heldFundCents / 100.0)
+                            Text(
+                                text = "$heldFormatted Held",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // User profile / switcher avatar
+                        IconButton(
+                            onClick = { showProfileScreen = true },
+                            modifier = Modifier.testTag("topbar_user_profile_btn")
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (currentUser == com.example.viewmodel.UserRole.COREY) MaterialTheme.colorScheme.primary
+                                        else if (currentUser == com.example.viewmodel.UserRole.SARAH) MaterialTheme.colorScheme.secondary
+                                        else MaterialTheme.colorScheme.outline
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (currentUser == com.example.viewmodel.UserRole.COREY) "C"
+                                    else if (currentUser == com.example.viewmodel.UserRole.SARAH) "S" else "L",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        },
         bottomBar = {
-            if (activeGame == ActiveGame.NONE && !showVoiceSession) {
+            if (activeGame == ActiveGame.NONE && !showVoiceSession && !showTreasuryScreen && !showProfileScreen) {
                 NavigationBar(
                     windowInsets = WindowInsets.navigationBars,
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -184,7 +280,7 @@ fun BrainApp(
             }
         },
         floatingActionButton = {
-            if (selectedTab == 8 && activeGame == ActiveGame.NONE && !showVoiceSession) {
+            if (selectedTab == 9 && activeGame == ActiveGame.NONE && !showVoiceSession && !showTreasuryScreen && !showProfileScreen) {
                 FloatingActionButton(onClick = { showVoiceSession = true }) {
                     Icon(androidx.compose.material.icons.Icons.Default.Mic, contentDescription = "Voice Session")
                 }
@@ -196,7 +292,23 @@ fun BrainApp(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (showVoiceSession) {
+            if (showTreasuryScreen) {
+                AdminPayoutScreen(
+                    authViewModel = adminAuthViewModel,
+                    treasuryViewModel = treasuryViewModel,
+                    onBack = { showTreasuryScreen = false }
+                )
+            } else if (showProfileScreen) {
+                ProfileAuthScreen(
+                    authViewModel = adminAuthViewModel,
+                    treasuryViewModel = treasuryViewModel,
+                    onNavigateToTreasury = {
+                        showProfileScreen = false
+                        showTreasuryScreen = true
+                    },
+                    onBack = { showProfileScreen = false }
+                )
+            } else if (showVoiceSession) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     VoiceSessionScreen()
                     IconButton(
@@ -218,13 +330,22 @@ fun BrainApp(
                         1 -> CommandCenterScreen(viewModel = commandViewModel)
                         2 -> IdeaVaultScreen(viewModel = ideaViewModel)
                         3 -> LiveBookScreen(viewModel = liveBookViewModel)
-                        4 -> UserProgressScreen(viewModel = userProgressViewModel)
-                        5 -> com.example.ui.screens.BrainMapScreen()
-                        6 -> CommunityTasksScreen(viewModel = communityViewModel)
-                        7 -> EvolutionBuilderScreen()
-                        8 -> ChatbotScreen(viewModel = chatbotViewModel)
-                        9 -> TruthAnalysisScreen(viewModel = truthAnalysisViewModel)
-                        10 -> WellnessSurveyScreen(viewModel = wellnessViewModel)
+                        4 -> UserProgressScreen(viewModel = userProgressViewModel, brainViewModel = viewModel)
+                        5 -> AdminPayoutScreen(
+                            authViewModel = adminAuthViewModel,
+                            treasuryViewModel = treasuryViewModel
+                        )
+                        6 -> com.example.ui.screens.BrainMapScreen()
+                        7 -> CommunityTasksScreen(viewModel = communityViewModel)
+                        8 -> EvolutionBuilderScreen()
+                        9 -> ChatbotScreen(viewModel = chatbotViewModel)
+                        10 -> TruthAnalysisScreen(viewModel = truthAnalysisViewModel)
+                        11 -> WellnessSurveyScreen(viewModel = wellnessViewModel)
+                        12 -> ProfileAuthScreen(
+                            authViewModel = adminAuthViewModel,
+                            treasuryViewModel = treasuryViewModel,
+                            onNavigateToTreasury = { viewModel.selectTab(5) }
+                        )
                         else -> MindsetStarterScreen()
                     }
                 }

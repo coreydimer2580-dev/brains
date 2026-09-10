@@ -19,7 +19,7 @@ class ExampleRobolectricTest {
   fun `read string from context`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
-    assertEquals("Brain Learning", appName)
+    assertEquals("corey++sarah++", appName)
   }
 
   @Test
@@ -130,5 +130,39 @@ class ExampleRobolectricTest {
     assertTrue("Report should contain streak", report.contains("Current Daily Streak: 3 days"))
     assertTrue("Report should list FOCUS_TRAINING", report.contains("FOCUS_TRAINING"))
     assertTrue("Report should list MEMORY_GRID", report.contains("MEMORY_GRID"))
+  }
+
+  @Test
+  fun `verify user progress tracking, topic mastery, and recommendations`() {
+    val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+    val progressVm = com.example.viewmodel.UserProgressViewModel(context)
+
+    // Seed sample calibration data
+    progressVm.seedSampleData()
+
+    // Verify topic masteries are computed
+    val masteries = progressVm.topicMasteries.value
+    assertTrue("Should compute topic masteries for all 5 cognitive disciplines", masteries.size == 5)
+
+    val memoryMastery = masteries.find { it.gameType == "MEMORY_GRID" }
+    assertNotNull("Working memory mastery should exist", memoryMastery)
+    assertTrue("Mastery score should be between 0 and 100", memoryMastery!!.masteryScore in 0..100)
+
+    // Verify recommendations are generated
+    val recommendations = progressVm.recommendations.value
+    assertTrue("Should generate focus recommendations", recommendations.isNotEmpty())
+    val topRec = recommendations.first()
+    assertNotNull("Top recommendation should have reason", topRec.reason)
+    assertNotNull("Top recommendation should have actionable task", topRec.actionDescription)
+
+    // Verify filtering mechanisms
+    progressVm.setTimeframeFilter(com.example.viewmodel.TimeframeFilter.LAST_7_DAYS)
+    assertEquals(com.example.viewmodel.TimeframeFilter.LAST_7_DAYS, progressVm.timeframeFilter.value)
+
+    progressVm.setMetricType(com.example.viewmodel.ProgressMetric.ACCURACY)
+    assertEquals(com.example.viewmodel.ProgressMetric.ACCURACY, progressVm.metricType.value)
+
+    progressVm.setTopicFilter("MEMORY_GRID")
+    assertEquals("MEMORY_GRID", progressVm.topicFilter.value)
   }
 }

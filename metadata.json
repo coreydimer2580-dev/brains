@@ -1,6 +1,6 @@
 {
-  "name": "Brain Learning",
-  "description": "Interactive neuroscience and cognitive brain training app featuring an interactive brain explorer, cognitive memory & focus workouts, and daily brain insights.",
+  "name": "corey++sarah++",
+  "description": "Empirical sports and racing predictive algorithm engine based purely on home/away win-loss records and winning number frequency tracking across the Next to Jump -> Closed Bet -> Resulted lifecycle, with zero bookmaker payout dependency.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

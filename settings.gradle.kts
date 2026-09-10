@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Brain Learning"
+rootProject.name = "corey++sarah++"
 
 include(":app")
